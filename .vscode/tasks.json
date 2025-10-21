@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_parallel_gcc",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}",
+                // Flags para habilitar concorrência
+                "-fopenmp", 
+                "-pthread"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always"
+            }//,
+           // "problemMatcher": "$gcc" 
+           // estava com um aviso mesmo funcionando
+        }
+    ]
+}

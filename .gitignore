@@ -1,0 +1,7 @@
+
+kmeans_1d_omp
+test_runner
+*.o
+*.out
+
+*.csv 
