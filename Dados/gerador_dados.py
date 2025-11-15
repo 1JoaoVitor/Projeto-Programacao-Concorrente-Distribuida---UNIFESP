@@ -17,12 +17,12 @@ for i in range(K):
 
 np.random.shuffle(dados)
 
-np.savetxt("dados.csv", dados, fmt='%.4f')
+np.savetxt("Dados/dados.csv", dados, fmt='%.4f')
 
 # Gerar centroides iniciais (um pouco deslocados dos reais para o algoritmo trabalhar)
 centroides_iniciais = [c + np.random.uniform(-5, 5) for c in CENTROIDES_REAIS]
 
-np.savetxt("centroides_iniciais.csv", centroides_iniciais, fmt='%.4f')
+np.savetxt("Dados/centroides_iniciais.csv", centroides_iniciais, fmt='%.4f')
 
 print(f"Arquivo 'dados.csv' com {len(dados)} pontos gerado.")
 print(f"Arquivo 'centroides_iniciais.csv' com {len(centroides_iniciais)} centroides gerado.")

@@ -16,9 +16,9 @@ int main(int argc, char **argv) {
     }
 
     const char* test_name = argv[1];
-    const char* data_file = "dados.csv";
-    const char* centroids_file = "centroides_iniciais.csv";
-    const char* executable = "./kmeans_1d_omp";
+    const char* data_file = "Dados/dados.csv";
+    const char* centroids_file = "Dados/centroides_iniciais.csv";
+    const char* executable = "./OMP/kmeans_1d_omp";
 
     if (strcmp(test_name, "scaling") == 0) {
         run_scaling_tests(executable, data_file, centroids_file);

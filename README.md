@@ -29,7 +29,7 @@ Para compilar os programas, utilize um compilador C com suporte a OpenMP (exempl
 
 1.  **Compilar o Executável K-means:**
     ```bash
-    gcc -O2 -fopenmp -std=c99 kmeans_1d_omp.c -o kmeans_1d_omp -lm
+    gcc -O2 -fopenmp -std=c99 OMP/kmeans_1d_omp.c -o OMP/kmeans_1d_omp -lm
     ```
     * `-O2`: Nível de otimização.
     * `-fopenmp`: Habilita o suporte OpenMP.
@@ -38,7 +38,7 @@ Para compilar os programas, utilize um compilador C com suporte a OpenMP (exempl
 
 2.  **Compilar o Orquestrador de Testes:**
     ```bash
-    gcc -O2 test_runner.c -o test_runner
+    gcc -O2 OMP/test_runner.c -o OMP/test_runner
     ```
 
 ## Execução
@@ -48,13 +48,13 @@ O orquestrador de testes (`test_runner`) automatiza a execução para análise d
 1.  **Executar Teste de Escalonamento (Threads):**
     Roda o K-means com 1, 2, 4, 8 e 16 threads (média de 3 execuções) e imprime a tabela de tempos e SSE final.
     ```bash
-    ./test_runner scaling
+    ./OMP/test_runner scaling
     ```
 
 2.  **Executar Teste de Agendamento (Schedule):**
     Roda o K-means com 4, 8 e 16 threads, testando as políticas `static` e `dynamic` com diferentes `chunk sizes` (média de 3 execuções).
     ```bash
-    ./test_runner schedule
+    ./OMP/test_runner schedule
     ```
 
 3.  **Executar o K-means Diretamente (Opcional):**
@@ -62,5 +62,5 @@ O orquestrador de testes (`test_runner`) automatiza a execução para análise d
     ```bash
     # Exemplo: Rodar com 8 threads, schedule static, chunk default
     export OMP_NUM_THREADS=8
-    ./kmeans_1d_omp dados.csv centroides_iniciais.csv 50 1e-6 static 0 
+    ./OMP/kmeans_1d_omp dados.csv centroides_iniciais.csv 50 1e-6 static 0 
     ```

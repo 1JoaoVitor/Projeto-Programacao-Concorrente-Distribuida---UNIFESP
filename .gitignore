@@ -1,6 +1,8 @@
-
+kmeans_1d_naive
 kmeans_1d_omp
 test_runner
+
+
 *.o
 *.out
 
