@@ -22,6 +22,7 @@ Para compilar o código, utilize o `nvcc`.
 ### Em ambiente local (com GPU NVIDIA genérica):
 ```bash
 nvcc -O2 Kmeans_1d_cuda.cu -o kmeans_1d_cuda
+```
 
 ### No Google Colab (GPU Tesla T4):
 
@@ -29,6 +30,7 @@ Devido a incompatibilidades de toolchain no ambiente Colab, recomenda-se compila
 
 ```bash
 nvcc -O2 -gencode arch=compute_75,code=sm_75 Kmeans_1d_cuda.cu -o kmeans_1d_cuda
+```
 
 ## Execução
 
@@ -36,10 +38,12 @@ O programa foi modificado para funcionar como uma bateria de testes automatizada
 
 ```bash
 ./kmeans_1d_cuda <dados.csv> <centroides.csv> <max_iter> <eps>
+```
 
 Por exemplo: 
 ```bash
 ./kmeans_1d_cuda ../Dados/dados.csv ../Dados/centroides_iniciais.csv 50 1e-6
+```
 
 ### Saída esperada
 
