@@ -15,6 +15,20 @@ Esta implementação segue o design **"Opção A"**:
 * **Hardware:** GPU NVIDIA (Testes realizados em Tesla T4).
 * **Software:** NVIDIA CUDA Toolkit (compilador `nvcc`).
 
+## Geração dos Dados de Teste (Opcional)
+
+**Requisitos:**
+* Python 3
+* Biblioteca NumPy (`pip install numpy`)
+
+**Uso:**
+1.  **Modifique os Parâmetros (Opcional):** Abra o arquivo `gerar_dados.py` e ajuste as variáveis `N` (número de pontos) e `K` (número de clusters) no início do script conforme desejado. Você também pode ajustar os `CENTROIDES_REAIS` e o `DESVIO_PADRAO`.
+2.  **Execute o Script:** No terminal, na pasta do projeto, execute:
+    ```bash
+    python3 gerar_dados.py
+    ```
+    Isso irá gerar (ou sobrescrever) os arquivos `dados.csv` e `centroides_iniciais.csv` com os novos parâmetros. Lembre-se que o script utiliza uma semente (`np.random.seed(42)`) para garantir a reprodutibilidade dos dados gerados.
+
 ## Compilação
 
 Para compilar o código, utilize o `nvcc`.
@@ -58,3 +72,7 @@ H2D/D2H: Tempos de transferência de memória.
 CPU Ovhd: Overhead do passo de atualização no Host.
 
 SSE Final: Para validação de corretude.
+
+### Colab
+
+Link para código no Colab disponível em: https://colab.research.google.com/drive/1b92w9wOw8YYCV1Wf7FlfyZExYQseYdGZ?usp=sharing
