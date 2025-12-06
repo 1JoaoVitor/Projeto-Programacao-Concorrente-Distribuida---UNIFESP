@@ -1,9 +1,5 @@
-
 /*
- * kmeans_1d_mpi.c
- * Implementação K-means 1D usando MPI (Memória Distribuída).
- * Estratégia: Rank 0 lê dados, distribui (Scatter), e recolhe (Gather).
- * Reduções globais usam MPI_Allreduce.
+ * kmeans_1d_mpi.c - Versão Corrigida
  */
 
 #include <mpi.h>
@@ -12,15 +8,17 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <time.h>
 
-// --- Funções Auxiliares (I/O apenas para Rank 0) ---
+// I/O apenas para Rank 0
 static int count_rows(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) return -1;
     int rows = 0; char line[8192];
     while (fgets(line, sizeof(line), f)) {
         int only_ws = 1;
-        for (char *p = line; *p; p++) if (*p != ' ' && *p != '\t' && *p != '\n') { only_ws = 0; break; }
+        for (char *p = line; *p; p++)
+            if (*p != ' ' && *p != '\t' && *p != '\n') { only_ws = 0; break; }
         if (!only_ws) rows++;
     }
     fclose(f);
@@ -37,7 +35,8 @@ static double *read_csv_1col(const char *path, int *n_out) {
     int r = 0; char line[8192];
     while (fgets(line, sizeof(line), f)) {
         int only_ws = 1;
-        for (char *p = line; *p; p++) if (*p != ' ' && *p != '\t' && *p != '\n') { only_ws = 0; break; }
+        for (char *p = line; *p; p++)
+            if (*p != ' ' && *p != '\t' && *p != '\n') { only_ws = 0; break; }
         if (only_ws) continue;
         A[r++] = atof(strtok(line, ",; \t"));
     }
@@ -60,62 +59,62 @@ static void write_csv_double(const char *path, const double *data, int N) {
     fclose(f);
 }
 
-// --- Função Principal ---
+
 int main(int argc, char **argv) {
-    // 1. Inicialização MPI
     MPI_Init(&argc, &argv);
 
     int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Quem sou eu?
-    MPI_Comm_size(MPI_COMM_WORLD, &size); // Quantos somos?
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // Argumentos
     if (argc < 3) {
-        if (rank == 0) printf("Uso: mpirun -np <P> %s dados.csv centroides.csv [args]\n", argv[0]);
+        if (rank == 0) {
+            printf("Uso: mpirun -np <P> %s dados.csv centroides.csv [max_iter] [epsilon] [--save-output]\n", argv[0]);
+        }
         MPI_Finalize();
         return 1;
     }
 
     int max_iter = (argc > 3) ? atoi(argv[3]) : 50;
     double eps = (argc > 4) ? atof(argv[4]) : 1e-4;
+    int save_output = 0;
+    for (int i = 5; i < argc; i++) {
+        if (strcmp(argv[i], "--save-output") == 0) save_output = 1;
+    }
 
-    // --- 2. Leitura de Dados (Apenas Rank 0) ---
+    // leitura de Dados - rank 0
     int N_global = 0, K = 0;
     double *X_global = NULL;
-    double *C = NULL; // Todos terão C completo
+    double *C = NULL;
 
+    double t_read_start = MPI_Wtime();
     if (rank == 0) {
-        printf("MPI Master (Rank 0) lendo arquivos...\n");
+        printf("=== K-means 1D MPI ===\n");
+        printf("Processos: %d\n", size);
         X_global = read_csv_1col(argv[1], &N_global);
         C = read_csv_1col(argv[2], &K);
         if (!X_global || !C) {
-            fprintf(stderr, "Erro na leitura.\n");
+            fprintf(stderr, "ERRO: Falha na leitura dos arquivos.\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
+        printf("Dados: N=%d pontos, K=%d clusters\n", N_global, K);
     }
+    double t_read_end = MPI_Wtime();
 
-    // --- 3. Broadcast de Metadados (N e K) ---
-    // Rank 0 avisa a todos qual é o tamanho de N e K
+    //broadcast
     MPI_Bcast(&N_global, 1, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(&K, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // Se não sou rank 0, aloco C (Rank 0 já alocou na leitura)
     if (rank != 0) C = (double*)malloc(K * sizeof(double));
-
-    // Broadcast dos Centróides Iniciais (Todos precisam começar iguais)
     MPI_Bcast(C, K, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    // --- 4. Distribuição de Dados (Scatterv) ---
-    // Precisamos dividir N pontos entre 'size' processos.
-    // Como a divisão pode não ser exata, usamos arrays de contagem (sendcounts) e deslocamento (displs).
-
+    // scatterv
     int *sendcounts = (int*)malloc(size * sizeof(int));
     int *displs = (int*)malloc(size * sizeof(int));
 
     int base_count = N_global / size;
     int remainder = N_global % size;
 
-    // Calcula quantos pontos cada processo vai receber
     int offset = 0;
     for (int i = 0; i < size; i++) {
         sendcounts[i] = base_count + (i < remainder ? 1 : 0);
@@ -123,42 +122,35 @@ int main(int argc, char **argv) {
         offset += sendcounts[i];
     }
 
-    int my_N = sendcounts[rank]; // Quantos pontos EU vou processar
+    int my_N = sendcounts[rank];
     double *my_X = (double*)malloc(my_N * sizeof(double));
     int *my_assign = (int*)malloc(my_N * sizeof(int));
 
-    // Scatterv: Rank 0 envia pedaços diferentes para cada um
-    // X_global -> my_X
+    double t_scatter_start = MPI_Wtime();
     MPI_Scatterv(X_global, sendcounts, displs, MPI_DOUBLE,
-                 my_X, my_N, MPI_DOUBLE,
-                 0, MPI_COMM_WORLD);
+                 my_X, my_N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    double t_scatter_end = MPI_Wtime();
 
-    // Rank 0 pode liberar a memória global gigante de X agora (opcional, mas bom pra economizar RAM)
-    // Mas vamos manter para o Gather no final, se a RAM permitir.
-
-    // --- 5. Loop K-means Distribuído ---
-    double prev_sse = 1e300;
+    // k-means de fato
+    double prev_sse = DBL_MAX;
     double global_sse = 0.0;
     int it;
 
-    double t0 = MPI_Wtime(); // Cronômetro MPI
+    double *local_sum = (double*)malloc(K * sizeof(double));
+    int *local_cnt = (int*)malloc(K * sizeof(int));
+    double *global_sum = (double*)malloc(K * sizeof(double));
+    int *global_cnt = (int*)malloc(K * sizeof(int));
+
+    double t_compute_start = MPI_Wtime();
 
     for (it = 0; it < max_iter; it++) {
-        // A. Broadcast C atualizado (Garantia que todos têm o mesmo C)
-        // Na prática, como usamos Allreduce depois, todos já têm os dados para atualizar C,
-        // mas um Bcast explícito do Rank 0 é seguro contra erros de ponto flutuante divergentes.
-        MPI_Bcast(C, K, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-        // B. Assignment Local
         double local_sse = 0.0;
-
-        // Estruturas para acumular soma e contagem locais
-        double *local_sum = (double*)calloc(K, sizeof(double));
-        int *local_cnt = (int*)calloc(K, sizeof(int));
+        memset(local_sum, 0, K * sizeof(double));
+        memset(local_cnt, 0, K * sizeof(int));
 
         for (int i = 0; i < my_N; i++) {
-            double bestd = 1e300;
-            int best = -1;
+            double bestd = DBL_MAX;
+            int best = 0;
             for (int c = 0; c < K; c++) {
                 double diff = my_X[i] - C[c];
                 double d = diff * diff;
@@ -166,64 +158,63 @@ int main(int argc, char **argv) {
             }
             my_assign[i] = best;
             local_sse += bestd;
-
             local_sum[best] += my_X[i];
             local_cnt[best]++;
         }
 
-        // C. Redução Global (MPI_Allreduce)
-        // Somar SSE local de todos -> SSE global em todos
         MPI_Allreduce(&local_sse, &global_sse, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-        // Somar arrays de soma e contagem de todos -> global em todos
-        // Como 'C' é pequeno, isso é rápido.
-        double *global_sum = (double*)malloc(K * sizeof(double));
-        int *global_cnt = (int*)malloc(K * sizeof(int));
-
         MPI_Allreduce(local_sum, global_sum, K, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(local_cnt, global_cnt, K, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-        // D. Atualizar Centróides (Cada um faz o seu, já que todos têm os dados globais)
-        // Isso evita ter que o Rank 0 calcule e faça outro Broadcast.
         for (int c = 0; c < K; c++) {
             if (global_cnt[c] > 0) C[c] = global_sum[c] / global_cnt[c];
-            // Se vazio, mantém (ou podia adotar estratégia de reset, mas precisa ser determinístico)
         }
 
-        free(local_sum); free(local_cnt);
-        free(global_sum); free(global_cnt);
-
-        // E. Checar Convergência
-        double rel = fabs(global_sse - prev_sse) / (prev_sse > 0.0 ? prev_sse : 1.0);
-        if (rel < eps) { it++; break; }
+        double rel_change = fabs(global_sse - prev_sse) / (prev_sse > 0.0 ? prev_sse : 1.0);
+        if (rel_change < eps) { it++; break; }
         prev_sse = global_sse;
     }
 
-    double t1 = MPI_Wtime();
+    double t_compute_end = MPI_Wtime();
 
-    // --- 6. Recolher Resultados (Gatherv) ---
-    // Rank 0 recolhe o vetor 'assign' de todos para salvar no arquivo
+    // gatherv
     int *assign_global = NULL;
     if (rank == 0) {
         assign_global = (int*)malloc(N_global * sizeof(int));
     }
 
+    double t_gather_start = MPI_Wtime();
     MPI_Gatherv(my_assign, my_N, MPI_INT,
                 assign_global, sendcounts, displs, MPI_INT,
                 0, MPI_COMM_WORLD);
+    double t_gather_end = MPI_Wtime();
 
-    // --- 7. Finalização e Saída ---
+    // resultados
     if (rank == 0) {
-        double ms = (t1 - t0) * 1000.0;
-        printf("--- MPI (%d processos) ---\n", size);
-        printf("Iterações: %d | SSE final: %.6f | Tempo: %.1f ms\n", it, global_sse, ms);
+        double t_read = t_read_end - t_read_start;
+        double t_scatter = t_scatter_end - t_scatter_start;
+        double t_compute = t_compute_end - t_compute_start;
+        double t_gather = t_gather_end - t_gather_start;
+        double t_total = t_read + t_scatter + t_compute + t_gather;
 
-        // Saída CSV simples para o seu test_runner ler, se for adaptar
-        // printf("%d,%.1f,%.6f\n", size, ms, global_sse);
+        printf("\n=== RESULTADOS ===\n");
+        printf("Iterações: %d\n", it);
+        printf("SSE final: %.6f\n", global_sse);
+        printf("\n=== TEMPOS (ms) ===\n");
+        printf("Leitura:       %8.2f ms\n", t_read * 1000.0);
+        printf("Scatter:       %8.2f ms\n", t_scatter * 1000.0);
+        printf("Computação:    %8.2f ms\n", t_compute * 1000.0);
+        printf("Gather:        %8.2f ms\n", t_gather * 1000.0);
+        printf("TOTAL:         %8.2f ms\n", t_total * 1000.0);
 
-        // Salvar arquivos (Opcional, pode ser lento com 50M)
-        // write_csv_int("assign_mpi.csv", assign_global, N_global);
-        // write_csv_double("centroids_mpi.csv", C, K);
+        printf("\n=== CSV (processos,tempo_ms,sse) ===\n");
+        printf("%d,%.2f,%.6f\n", size, t_compute * 1000.0, global_sse);
+
+        if (save_output) {
+            write_csv_int("assign_mpi.csv", assign_global, N_global);
+            write_csv_double("centroids_mpi.csv", C, K);
+            printf("\nArquivos salvos: assign_mpi.csv, centroids_mpi.csv\n");
+        }
 
         free(X_global);
         free(assign_global);
@@ -234,6 +225,10 @@ int main(int argc, char **argv) {
     free(C);
     free(sendcounts);
     free(displs);
+    free(local_sum);
+    free(local_cnt);
+    free(global_sum);
+    free(global_cnt);
 
     MPI_Finalize();
     return 0;
