@@ -1,7 +1,3 @@
-/*
- * kmeans_1d_mpi.c - Versão Corrigida
- */
-
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
