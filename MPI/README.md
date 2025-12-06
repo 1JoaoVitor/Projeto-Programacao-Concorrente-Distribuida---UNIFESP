@@ -63,6 +63,8 @@ O programa imprimirá no terminal do Mestre:
 - Uma linha formatada em CSV para facilitar scripts de benchmarking.
 
 
+Link do colab utilizado: https://colab.research.google.com/drive/1uKopFKgd2t1gyXyJApdaCIirqrqfTnsa?usp=sharing
+
 
 
 
